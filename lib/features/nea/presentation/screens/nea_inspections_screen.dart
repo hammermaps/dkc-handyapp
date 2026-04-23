@@ -33,21 +33,42 @@ final _inspectionsProvider =
       );
 });
 
-class NeaInspectionsScreen extends ConsumerWidget {
+class NeaInspectionsScreen extends ConsumerStatefulWidget {
   const NeaInspectionsScreen({this.systemId, this.systemName, super.key});
 
   final int? systemId;
   final String? systemName;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NeaInspectionsScreen> createState() =>
+      _NeaInspectionsScreenState();
+}
+
+class _NeaInspectionsScreenState extends ConsumerState<NeaInspectionsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Seed the filter with the system ID passed via the route so the
+    // repository query is scoped correctly from the first load.
+    if (widget.systemId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(_filtersProvider.notifier).state =
+              NeaInspectionFilters(systemId: widget.systemId);
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final inspectionsAsync = ref.watch(_inspectionsProvider);
     final filters = ref.watch(_filtersProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(systemName != null
-            ? 'Prüfungen: $systemName'
+        title: Text(widget.systemName != null
+            ? 'Prüfungen: ${widget.systemName}'
             : 'NEA Prüfungen'),
         actions: [
           IconButton(
@@ -56,7 +77,7 @@ class NeaInspectionsScreen extends ConsumerWidget {
           ),
           IconButton(
             icon: const Icon(Icons.filter_list_rounded),
-            onPressed: () => _showFilterSheet(context, ref, filters),
+            onPressed: () => _showFilterSheet(context, filters),
           ),
         ],
       ),
@@ -73,14 +94,7 @@ class NeaInspectionsScreen extends ConsumerWidget {
                 onRetry: () => ref.invalidate(_inspectionsProvider),
               ),
               data: (inspections) {
-                final filtered = inspections.where((i) {
-                  if (systemId != null && i.neaSystemId != systemId) {
-                    return false;
-                  }
-                  return true;
-                }).toList();
-
-                if (filtered.isEmpty) {
+                if (inspections.isEmpty) {
                   return const Center(
                       child: Text('Keine Prüfungen gefunden'));
                 }
@@ -89,10 +103,10 @@ class NeaInspectionsScreen extends ConsumerWidget {
                       ref.invalidate(_inspectionsProvider),
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
-                    itemCount: filtered.length,
+                    itemCount: inspections.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (ctx, i) =>
-                        _InspectionCard(inspection: filtered[i]),
+                        _InspectionCard(inspection: inspections[i]),
                   ),
                 );
               },
@@ -104,7 +118,7 @@ class NeaInspectionsScreen extends ConsumerWidget {
   }
 
   void _showFilterSheet(
-      BuildContext context, WidgetRef ref, NeaInspectionFilters current) {
+      BuildContext context, NeaInspectionFilters current) {
     final currentYear = DateTime.now().year;
     showModalBottomSheet(
       context: context,

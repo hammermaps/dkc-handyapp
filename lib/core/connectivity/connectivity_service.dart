@@ -7,14 +7,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class ConnectivityService {
   ConnectivityService() : _connectivity = Connectivity() {
     _controller = StreamController<bool>.broadcast();
-    _connectivity.onConnectivityChanged.listen((results) {
+    _subscription = _connectivity.onConnectivityChanged.listen((results) {
       final connected = results.any((r) => r != ConnectivityResult.none);
       _controller.add(connected);
+    });
+    // Emit initial connectivity state immediately.
+    _connectivity.checkConnectivity().then((results) {
+      if (!_controller.isClosed) {
+        _controller.add(results.any((r) => r != ConnectivityResult.none));
+      }
     });
   }
 
   final Connectivity _connectivity;
   late final StreamController<bool> _controller;
+  late final StreamSubscription<List<ConnectivityResult>> _subscription;
 
   Stream<bool> get isConnectedStream => _controller.stream;
 
@@ -24,6 +31,7 @@ class ConnectivityService {
   }
 
   void dispose() {
+    _subscription.cancel();
     _controller.close();
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/providers.dart' show selectedProjectIdProvider;
 import '../../../../shared/widgets/last_synced_text.dart';
 import '../../../../shared/widgets/offline_banner.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -13,12 +14,10 @@ final _projectsProvider =
   return repo.getProjectsList();
 });
 
-final _selectedProjectIdProvider = StateProvider<int?>((ref) => null);
-
 final _dashboardDataProvider =
     StreamProvider.autoDispose<Map<String, dynamic>>((ref) {
   final repo = ref.watch(dashboardRepositoryProvider);
-  final projectId = ref.watch(_selectedProjectIdProvider);
+  final projectId = ref.watch(selectedProjectIdProvider);
   return repo.getDashboardData(projectId);
 });
 
@@ -31,7 +30,7 @@ class DashboardScreen extends ConsumerWidget {
     final permissions = ref.watch(userPermissionsProvider);
     final projectsAsync = ref.watch(_projectsProvider);
     final dashboardAsync = ref.watch(_dashboardDataProvider);
-    final selectedProjectId = ref.watch(_selectedProjectIdProvider);
+    final selectedProjectId = ref.watch(selectedProjectIdProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -57,7 +56,7 @@ class DashboardScreen extends ConsumerWidget {
               projects: projects,
               selectedId: selectedProjectId,
               onChanged: (id) =>
-                  ref.read(_selectedProjectIdProvider.notifier).state = id,
+                  ref.read(selectedProjectIdProvider.notifier).state = id,
             ),
           ),
         ),
@@ -168,8 +167,10 @@ class _DashboardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final syncedAt = DateTime.now();
-
+    // Read the actual sync time stored in the data map by the repository.
+    final syncedAtRaw = data['_syncedAt'] as String?;
+    final syncedAt =
+        syncedAtRaw != null ? DateTime.tryParse(syncedAtRaw) : null;
     final modules = <_ModuleInfo>[
       _ModuleInfo(
         title: 'Mängelmeldungen',
@@ -221,8 +222,10 @@ class _DashboardBody extends StatelessWidget {
             'Willkommen, ${user.vname} ${user.nname}',
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 4),
-          LastSyncedText(syncedAt: syncedAt),
+          if (syncedAt != null) ...[
+            const SizedBox(height: 4),
+            LastSyncedText(syncedAt: syncedAt),
+          ],
           const SizedBox(height: 16),
         ],
         GridView.builder(

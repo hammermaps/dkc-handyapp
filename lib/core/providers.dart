@@ -19,15 +19,9 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 /// Falls back to a placeholder URL if none is stored yet.
 final apiClientProvider = Provider<ApiClient>((ref) {
   final tokenStorage = ref.watch(tokenStorageProvider);
-  // Token is fetched synchronously via a cached value held by TokenStorage.
-  // The actual async loading is handled by AuthRepository / auth state.
   return ApiClient(
     baseUrl: 'https://placeholder.invalid',
-    tokenGetter: () {
-      // Token retrieval is async; we use a late-initialized cache pattern.
-      // Actual token injection happens in auth flow.
-      return null;
-    },
+    tokenGetter: () => null,
   );
 });
 
@@ -38,3 +32,7 @@ ApiClient createApiClient({
 }) {
   return ApiClient(baseUrl: baseUrl, tokenGetter: tokenGetter);
 }
+
+/// App-wide selected project ID. Shared across all feature modules so that
+/// every screen respects the project chosen on the Dashboard.
+final selectedProjectIdProvider = StateProvider<int?>((ref) => null);

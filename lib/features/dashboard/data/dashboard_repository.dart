@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
@@ -44,10 +45,12 @@ class DashboardRepository {
   /// Returns dashboard data as a JSON-decoded map.
   /// Loads from local DB first, then refreshes from API if online.
   Stream<Map<String, dynamic>> getDashboardData(int? projectId) async* {
-    // 1. Yield cached data immediately.
+    // 1. Yield cached data immediately (include syncedAt for the UI timestamp).
     final cached = await _db.dashboardDao.getCacheForProject(projectId);
     if (cached != null) {
-      yield jsonDecode(cached.data) as Map<String, dynamic>;
+      final map = jsonDecode(cached.data) as Map<String, dynamic>;
+      map['_syncedAt'] = cached.syncedAt?.toIso8601String();
+      yield map;
     }
 
     // 2. Fetch from API if online.
@@ -58,14 +61,17 @@ class DashboardRepository {
           'dashboard_data',
           queryParams: projectId != null ? {'project_id': projectId} : null,
         );
+        final now = DateTime.now();
         await _db.dashboardDao.upsertCache(
           DashboardCacheTableCompanion.insert(
             projectId: Value(projectId),
             data: jsonEncode(data),
-            syncedAt: Value(DateTime.now()),
+            syncedAt: Value(now),
           ),
         );
-        yield data as Map<String, dynamic>;
+        final map = Map<String, dynamic>.from(data as Map<String, dynamic>);
+        map['_syncedAt'] = now.toIso8601String();
+        yield map;
       } on NetworkException {
         // Already yielded cache
       } catch (_) {

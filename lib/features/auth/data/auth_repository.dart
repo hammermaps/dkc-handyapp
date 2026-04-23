@@ -12,12 +12,14 @@ import '../../../shared/models/user_model.dart';
 class AuthRepository {
   AuthRepository({
     required TokenStorage tokenStorage,
-    required ApiClient Function(String baseUrl) apiClientFactory,
+    required ApiClient Function(String baseUrl, String? Function() tokenGetter)
+        apiClientFactory,
   })  : _tokenStorage = tokenStorage,
         _apiClientFactory = apiClientFactory;
 
   final TokenStorage _tokenStorage;
-  final ApiClient Function(String baseUrl) _apiClientFactory;
+  final ApiClient Function(String baseUrl, String? Function() tokenGetter)
+      _apiClientFactory;
 
   ApiClient? _client;
 
@@ -27,7 +29,10 @@ class AuthRepository {
     if (url == null || url.isEmpty) {
       throw const NetworkException(message: 'Server-URL nicht konfiguriert');
     }
-    _client = _apiClientFactory(url);
+    // Read the token once and capture it in a closure so the client can inject
+    // the Authorization header on every request.
+    final token = await _tokenStorage.getToken();
+    _client = _apiClientFactory(url, () => token);
     return _client!;
   }
 
@@ -42,7 +47,8 @@ class AuthRepository {
         serverUrl.endsWith('/') ? serverUrl.substring(0, serverUrl.length - 1) : serverUrl;
 
     await _tokenStorage.saveServerUrl(normalizedUrl);
-    _client = _apiClientFactory(normalizedUrl);
+    // Pre-login client has no token (auth_login doesn't require one)
+    _client = _apiClientFactory(normalizedUrl, () => null);
 
     try {
       final data = await _client!.post('auth_login', body: {
@@ -58,12 +64,8 @@ class AuthRepository {
       }
       await _tokenStorage.saveToken(token);
 
-      // Re-create client with token
-      final String? currentToken = await _tokenStorage.getToken();
-      _client = ApiClient(
-        baseUrl: normalizedUrl,
-        tokenGetter: () => currentToken,
-      );
+      // Re-create client with the freshly saved token
+      _client = _apiClientFactory(normalizedUrl, () => token);
 
       // Load user info
       final user = await getUserInfo();

@@ -11,12 +11,9 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final tokenStorage = ref.watch(tokenStorageProvider);
   return AuthRepository(
     tokenStorage: tokenStorage,
-    apiClientFactory: (baseUrl) => ApiClient(
+    apiClientFactory: (baseUrl, tokenGetter) => ApiClient(
       baseUrl: baseUrl,
-      tokenGetter: () {
-        // Token is loaded asynchronously; repository handles this internally.
-        return null;
-      },
+      tokenGetter: tokenGetter,
     ),
   );
 });

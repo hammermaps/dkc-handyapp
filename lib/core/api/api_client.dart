@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 
 import 'api_exception.dart';
 
@@ -21,7 +21,12 @@ class ApiClient {
     _dio.interceptors.addAll([
       _AuthInterceptor(tokenGetter: _tokenGetter),
       _ErrorInterceptor(),
-      LogInterceptor(requestBody: false, responseBody: false),
+      if (kDebugMode)
+        LogInterceptor(
+          requestBody: false,
+          responseBody: false,
+          requestHeader: false,
+        ),
     ]);
   }
 
@@ -195,8 +200,3 @@ ApiException dioExceptionToApiException(DioException e) {
   if (e.error is ApiException) return e.error as ApiException;
   return NetworkException(message: e.message ?? 'Unbekannter Fehler');
 }
-
-/// Provider placeholder – actual provider is in core/providers.dart.
-final apiClientProvider = Provider<ApiClient>((ref) {
-  throw UnimplementedError('Override apiClientProvider with actual implementation');
-});
